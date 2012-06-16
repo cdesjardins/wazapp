@@ -67,9 +67,9 @@ class MessageStore(QObject):
 		conv = self.conversations[jid]
 		
 		if conv.type == "single":
-			self.store.Message.deleteSingle({"conversation_id":conv.id, "id":msgid})
+			self.store.Message.delete({"conversation_id":conv.id, "id":msgid})
 		else:
-			self.store.Groupmessage.deleteSingle({"groupconversation_id":conv.id, "id":msgid})
+			self.store.Groupmessage.delete({"groupconversation_id":conv.id, "id":msgid})
 
 
 	

@@ -26,7 +26,7 @@ symbian:TARGET.CAPABILITY += NetworkServices
 # If your application uses the Qt Mobility libraries, uncomment the following
 # lines and add the respective components to the MOBILITY variable.
  CONFIG += mobility console
- MOBILITY += systeminfo messaging
+ MOBILITY += systeminfo messaging contacts
 
 # Speed up launching on MeeGo/Harmattan when using applauncherd daemon
 # CONFIG += qdeclarative-boostable
@@ -136,10 +136,18 @@ OTHER_FILES += \
     invoker/waxmppaccount \
     waxmpp.service \
     wazapp.message.new.conf \
-    qtc_packaging/debian_harmattan/postinst
+    qtc_packaging/debian_harmattan/postinst \
+    qtc_packaging/debian_harmattan/rules \
+    qtc_packaging/debian_harmattan/README \
+    qtc_packaging/debian_harmattan/manifest.aegis \
+    qtc_packaging/debian_harmattan/copyright \
+    qtc_packaging/debian_harmattan/control \
+    qtc_packaging/debian_harmattan/compat \
+    qtc_packaging/debian_harmattan/changelog
 
 contains(MEEGO_EDITION,harmattan) {
     desktopfile.files = waxmppplugin.desktop
     desktopfile.path = /usr/share/applications
     INSTALLS += desktopfile
 }
+
