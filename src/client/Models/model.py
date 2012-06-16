@@ -134,7 +134,6 @@ class Model(object):
 	
 	def delete(self,conds = None):
 		
-		
 		q = "DELETE FROM %s "%self.table
 			
 		if conds is not None:
@@ -148,6 +147,21 @@ class Model(object):
 		c.execute(q)
 		self.conn.commit()
 		
+
+
+	def deleteSingle(self, conds = None):
+
+		q = "DELETE FROM %s "%self.table
+			
+		if conds is not None:
+			q+="WHERE %s"%self.buildConds(conds);
+		else:
+			print "Missing parameters,cancelled!"
+			
+		c = self.conn.cursor();
+		c.execute(q)
+		self.conn.commit()
+
 				
 	
 	def insert(self):

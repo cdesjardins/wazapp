@@ -22,6 +22,7 @@ from PySide.QtCore import *
 from PySide.QtGui import *
 from PySide.QtDeclarative import QDeclarativeView,QDeclarativeProperty
 from contacts import WAContacts
+from QtMobility.Contacts import *
 from status import WAChangeStatus
 from waxmpp import WAXMPP
 from utilities import Utilities
@@ -69,7 +70,13 @@ class WAUI(QDeclarativeView):
 		self.c.contactsSyncStatusChanged.connect(self.rootObject().onContactsSyncStatusChanged);
 		self.rootObject().refreshContacts.connect(self.c.resync)
 		self.rootObject().loadConversationsThread.connect(self.populateAllConversations)
-		
+				
+		self.cm = QContactManager(self);
+		self.cm.contactsChanged.connect(self.rootObject().onContactsChanged);
+		self.cm.contactsAdded.connect(self.rootObject().onContactsChanged);
+		self.cm.contactsRemoved.connect(self.rootObject().onContactsChanged);
+
+
 		
 		#self.rootObject().quit.connect(self.quit)
 		
@@ -79,6 +86,7 @@ class WAUI(QDeclarativeView):
 		
 		
 		self.rootObject().deleteConversation.connect(self.messageStore.deleteConversation)
+		self.rootObject().deleteSingleMessage.connect(self.messageStore.deleteSingleMessage)
 		
 		self.dbusService = WAService(self);
 		
@@ -137,11 +145,11 @@ class WAUI(QDeclarativeView):
 		
 	def blabla(self,tt):
 		print tt
-		
+
+
+
 	def populateContacts(self):
 		#syncer = ContactsSyncer(self.store);
-		
-		
 		
 		
 		#self.c.refreshing.connect(syncer.onRefreshing);
@@ -238,6 +246,9 @@ class WAUI(QDeclarativeView):
 		whatsapp.eventHandler.mediaTransferSuccess.connect(self.rootObject().onMediaTransferSuccess);
 		whatsapp.eventHandler.mediaTransferError.connect(self.rootObject().onMediaTransferError);
 		whatsapp.eventHandler.mediaTransferProgressUpdated.connect(self.rootObject().onMediaTransferProgressUpdated)
+
+		whatsapp.eventHandler.mediaTransferSuccess.connect(self.rootObject().onMediaTransferSuccess);
+
 		
 		whatsapp.eventHandler.doQuit.connect(self.preQuit);
 		
