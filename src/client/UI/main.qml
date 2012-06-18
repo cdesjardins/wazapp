@@ -37,9 +37,8 @@ WAStackWindow {
 	signal addEmojiToChat
 	property string addedEmojiCode
 	property bool showSendButton
-	signal updateUnreadCount
 	property string activeWindow
-	property bool addToUread: false
+	property string profileUser
 
     property string waversiontype:waversion.split('.').length == 4?'developer':'beta'
     
@@ -110,6 +109,9 @@ WAStackWindow {
     signal fetchMedia(int id);
     signal fetchGroupMedia(int id);
     signal loadConversationsThread(string user_id, int first, int limit);
+    signal conversationOpened(string jid);
+	signal sendSMS(string num)
+	signal makeCall(string num)
 
 
             /******************/
@@ -193,14 +195,6 @@ WAStackWindow {
         osd_notify.show();
     }
 
-	function updatingConversationsOn() {
-		addToUread = false
-	}
-
-	function updatingConversationsOff() {
-		addToUread = true
-	}
-
 	//prevent double opened, sometimes QContactsManager sends more than 1 signal
 	property bool updateContactsOpenend: false
 
@@ -262,11 +256,23 @@ WAStackWindow {
         return 0;
     }
 
+	signal clearUnreadMessages
+	property string clearUnreadMessagesID
+
+	signal updateChatItem
+	property string updatedChatId
+	property string updatedChatName
+	property string updatedChatPicture
+	
     function openConversation(jid){
         console.log("should open chat window with "+jid)
+		conversationOpened(jid)
+		clearUnreadMessagesID = jid
+		clearUnreadMessages()
 
-        if(getActiveConversation() != jid)
+        if(getActiveConversation() != jid) {
             waContacts.openChatWindow(jid)
+		}
     }
 
     function pushContacts(contacts){
@@ -280,6 +286,11 @@ WAStackWindow {
     function messagesReady(messages)
     {
         waContacts.addMessage(messages.user_id, messages.data)
+    }
+
+    function conversationReady(conv){
+        //var chatWindow = waContacts.openChatWindow(conv.jid);
+       // waContacts.addMessage(conv.user_id,conv.lastMessage)
     }
 
     function onLastSeenUpdated(user_id,seconds){
@@ -329,9 +340,6 @@ WAStackWindow {
 
     /*****************************************/
 
-	ListModel {
-		id: unreadModel
-	}
 
     ListModel{
         id:chatsModel

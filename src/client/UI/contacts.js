@@ -62,6 +62,16 @@ function populateContacts()
             contacts[i].hasPicture = true;
         contactsModel.append(contacts[i]);
 
+		for (var j=0; j<chatsModel.count;j++) {
+			if (chatsModel.get(j).jid == contacts[i].jid) {
+				appWindow.updatedChatName = contacts[i].name
+				appWindow.updatedChatPicture = contacts[i].picture
+				appWindow.updatedChatId = contacts[i].jid
+				console.log("UPDATED CONTACT!")
+				appWindow.updateChatItem()
+			}
+		}
+
     }
 }
 
@@ -96,6 +106,7 @@ function createChatWindow(user_id,user_name,user_picture)
        // dynamicObject.anchors.fill = contactsContainer
 
         //dynamicObject.z=1
+       // dynamicObject.subject = user_id.index('-')>-1?user_name:""
         dynamicObject.user_name = user_name
         dynamicObject.user_id = user_id
         dynamicObject.user_picture = user_picture
@@ -135,7 +146,7 @@ function openChatWindow(user_id,prev_state){
 
      }
 
-
      chatWindow.prev_state=prev_state
      chatWindow.conversation.visible =true;
+
 }

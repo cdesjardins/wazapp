@@ -1,5 +1,3 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
 '''
 Copyright (c) 2012, Tarek Galal <tarek@wazapp.im>
 
@@ -18,27 +16,38 @@ PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with 
 Wazapp. If not, see http://www.gnu.org/licenses/.
 '''
-import sys
-from PySide.QtGui import QApplication
-import PySide
-from wamanager import WAManager
-from PySide import QtCore
+import time,datetime,re
+from dateutil import tz
 
-#from waxmpp import WAXMPP
-#from utilities import Utilities
-
-
+class WATime():
+	def parseIso(self,iso):
+		d=datetime.datetime(*map(int, re.split('[^\d]', iso)[:-1]))
+		return d
+		
+	def utcToLocal(self,dt):
+		utc = tz.gettz('UTC');
+		local = tz.tzlocal()
+		dtUtc =  dt.replace(tzinfo=utc);
+		
+		return dtUtc.astimezone(local)
 	
-if __name__ == "__main__":
+	def datetimeToTimestamp(self,dt):
+		return time.mktime(dt.timetuple());
+		
 
+if __name__=="__main__":
+	ds = "2012-06-16T15:24:36Z"
+	watime = WATime();
 	
-	lang_name = unicode(QtCore.QLocale.system().name())
-	translator = QtCore.QTranslator()
-	translator.load("/opt/waxmppplugin/bin/wazapp/i18n/tr_" + lang_name[:2] + ".qm")
-	app = QApplication(sys.argv)
-	app.installTranslator(translator)
-	#PySide.QtGui.QErrorMessage.qtHandler().show()
-	wam = WAManager(app)
-
+	print ds
 	
-	sys.exit(app.exec_())
+	parsed = watime.parseIso(ds)
+	print parsed
+	
+	local = watime.utcToLocal(parsed)
+	print local
+	
+	stamp = watime.datetimeToTimestamp(local)
+	print stamp
+	
+	

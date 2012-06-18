@@ -34,6 +34,7 @@ Rectangle{
     property string jid;
     property bool hasPicture;
     signal clicked();
+    signal optionsRequested()
 
     //height:80;
     width: parent.width;
@@ -52,7 +53,8 @@ Rectangle{
         id:mouseArea
         anchors.fill: parent
         //onClicked: {controls.opacity=1;container.height=80}
-        onClicked: container.clicked(number)//{console.log("EXPANDING");container.state=container.state=="opened"?"":"opened"}
+        onClicked: container.clicked(number) //{console.log("EXPANDING");container.state=container.state=="opened"?"":"opened"}
+		onPressAndHold: container.optionsRequested()
     }
 
     states: State{

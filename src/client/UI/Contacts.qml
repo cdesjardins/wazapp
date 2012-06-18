@@ -262,6 +262,11 @@ Page {
 				hideSearchBar()
 				if(searchbar.height==71) searchInput.platformCloseSoftwareInputPanel()
 			}
+			
+			onOptionsRequested: {
+				profileUser = model.jid
+				contactItemMenu.open()
+			}
         }
     }
 
@@ -407,6 +412,21 @@ Page {
 		}
 
     }
+
+	Menu {
+	id: contactItemMenu
+
+		MenuLayout {
+			MyMenuItem {
+				height: 80
+				singleItem: true
+				text: qsTr("View contact profile")
+				onClicked: { 
+					mainPage.pageStack.push (Qt.resolvedUrl("ContactProfile.qml"))
+				}
+			}
+		}
+	}
 
 
 }

@@ -22,7 +22,8 @@
 // import QtQuick 1.0 // to target S60 5th Edition or Maemo 5
 import QtQuick 1.1
 import com.nokia.meego 1.0
-import QtMobility.contacts 1.1
+//import QtMobility.contacts 1.1
+import "Global.js" as Helpers
 
 Page {
     id:container
@@ -38,31 +39,22 @@ Page {
         }
     }
 
-	ContactModel { id:myContacts }
-
-	property string cNumber
+	property string contactName
+	property string contactNumber
+	property string contactPicture: "pics/user.png"
+	property string contactStatus: qsTr("Hi there I'm using Wazapp")
 
 	Component.onCompleted: {
-        for(var i =0; i<contactsModel.count; i++)
-        {
-            if(contactsModel.get(i).jid == activeWindow) {
-                picture.imgsource = contactsModel.get(i).picture
-				contact_name.text = contactsModel.get(i).name
-				contact_status.text = contactsModel.get(i).status
-				cNumber = contactsModel.get(i).number
-				break;
-			}
-        }
-		console.log("CONTACTS: " + myContacts.count)
-        for(var i =0; i<myContacts.count; i++)
-        {
-			console.log("CONTACT: " + myContacts.get(i).contact.name + " - NUMBER: " + myContacts.get(i).contact.number)
-            if(myContacts.get(i).contact.number == cNumber) {
-				contact_name.text = myContacts.get(i).contact.name
-				break;
-			}
-        }
 
+        for(var i =0; i<contactsModel.count; i++) {
+            if(contactsModel.get(i).jid == profileUser) {
+                contactPicture = contactsModel.get(i).picture
+				contactName = contactsModel.get(i).name
+				contactStatus = contactsModel.get(i).status
+				contactNumber = contactsModel.get(i).number
+				break;
+			}
+        }
 
 	}
 
@@ -83,7 +75,7 @@ Page {
 				size: 80
 				height: size
 				width: size
-				imgsource: "pics/user.png"
+				imgsource: contactPicture
 			}
 
 			Column {
@@ -91,22 +83,88 @@ Page {
 				anchors.verticalCenter: picture.verticalCenter
 
 				Label {
-					id: contact_name
+					text: contactName
 					font.bold: true
 					font.pixelSize: 26
+					width: parent.width
+					elide: Text.ElideRight
 				}
 
 				Label {
-					id: contact_status
 					font.pixelSize: 22
 					color: "gray"
-					text: qsTr("Hi there I'm using Wazapp")
+					text: Helpers.emojify(contactStatus)
+					width: parent.width
+					elide: Text.ElideRight
 				}
 			}
 		}
 
 		Separator {
 			width: parent.width
+		}
+
+		Label {
+			font.pixelSize: 26
+			text: qsTr("Phone:")
+			width: parent.width
+		}
+
+		Rectangle {
+			height: 84
+			width: parent.width
+			color: "transparent"
+			x: 0
+
+			BorderImage {
+				height: 84
+				width: parent.width -80
+				x: 0; y: 0
+				source: "pics/buttons/button-left"+(theme.inverted?"-inverted":"")+
+						(bArea.pressed? "-pressed" : "")+".png"
+				border { left: 22; right: 22; bottom: 22; top: 22; }
+
+				Label {
+					x: 20; y: 14
+					width: parent.width
+					font.pixelSize: 20
+					text: qsTr("Mobile phone")
+				}
+				Label {
+					x: 20; y: 40
+					width: parent.width
+					font.bold: true
+					font.pixelSize: 24
+					text: contactNumber
+				}
+				MouseArea {
+					id: bArea
+					anchors.fill: parent
+					onClicked: makeCall(contactNumber) 
+				}
+			}
+
+			BorderImage {
+				height: 84
+				anchors.right: parent.right
+				width: 80
+				x: 0; y: 0
+				source: "pics/buttons/button-right"+(theme.inverted?"-inverted":"")+
+						(bcArea.pressed? "-pressed" : "")+".png"
+				border { left: 22; right: 22; bottom: 22; top: 22; }
+
+				Image {
+					x: 18
+					anchors.verticalCenter: parent.verticalCenter
+					source: "image://theme/icon-m-toolbar-new-message"+(theme.inverted?"-white":"")
+				}
+				MouseArea {
+					id: bcArea
+					anchors.fill: parent
+					onClicked: sendSMS(contactNumber)
+				}
+			}
+
 		}
 
 	}

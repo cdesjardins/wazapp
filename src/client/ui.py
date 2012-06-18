@@ -21,8 +21,8 @@ from PySide import QtCore
 from PySide.QtCore import *
 from PySide.QtGui import *
 from PySide.QtDeclarative import QDeclarativeView,QDeclarativeProperty
+from QtMobility.Messaging import *
 from contacts import WAContacts
-from QtMobility.Contacts import *
 from status import WAChangeStatus
 from waxmpp import WAXMPP
 from utilities import Utilities
@@ -32,13 +32,15 @@ from messagestore import MessageStore
 from threading import Timer
 from waservice import WAService
 import dbus
-
+from wadebug import UIDebug
 
 class WAUI(QDeclarativeView):
 	quit = QtCore.Signal()
 	
 	def __init__(self):
-	
+		
+		_d = UIDebug();
+		self._d = _d.d;
 	
 		
 		super(WAUI,self).__init__();
@@ -54,7 +56,7 @@ class WAUI(QDeclarativeView):
 		
 	
 	def preQuit(self):
-		print "pre quit"
+		self._d("pre quit")
 		del self.whatsapp
 		del self.c
 		self.quit.emit()
@@ -70,11 +72,13 @@ class WAUI(QDeclarativeView):
 		self.c.contactsSyncStatusChanged.connect(self.rootObject().onContactsSyncStatusChanged);
 		self.rootObject().refreshContacts.connect(self.c.resync)
 		self.rootObject().loadConversationsThread.connect(self.populateAllConversations)
+		self.rootObject().sendSMS.connect(self.sendSMS)
+		self.rootObject().makeCall.connect(self.makeCall)
 				
-		self.cm = QContactManager(self);
-		self.cm.contactsChanged.connect(self.rootObject().onContactsChanged);
-		self.cm.contactsAdded.connect(self.rootObject().onContactsChanged);
-		self.cm.contactsRemoved.connect(self.rootObject().onContactsChanged);
+		#Changed by Tarek: connected directly to QContactManager living inside contacts manager
+		self.c.manager.manager.contactsChanged.connect(self.rootObject().onContactsChanged);
+		self.c.manager.manager.contactsAdded.connect(self.rootObject().onContactsChanged);
+		self.c.manager.manager.contactsRemoved.connect(self.rootObject().onContactsChanged);
 
 
 		
@@ -82,12 +86,12 @@ class WAUI(QDeclarativeView):
 		
 		self.messageStore = MessageStore(self.store);
 		self.messageStore.messagesReady.connect(self.rootObject().messagesReady)
-		
+		self.messageStore.conversationReady.connect(self.rootObject().conversationReady)
 		
 		
 		self.rootObject().deleteConversation.connect(self.messageStore.deleteConversation)
 		self.rootObject().deleteSingleMessage.connect(self.messageStore.deleteSingleMessage)
-		
+		self.rootObject().conversationOpened.connect(self.messageStore.onConversationOpened)
 		self.dbusService = WAService(self);
 		
 	
@@ -115,7 +119,7 @@ class WAUI(QDeclarativeView):
 		self.whatsapp.eventHandler.onAvailable();
 	
 	def closeEvent(self,e):
-		print "HIDING"
+		self._d("HIDING")
 		e.ignore();
 		self.whatsapp.eventHandler.onUnfocus();
 		
@@ -126,12 +130,11 @@ class WAUI(QDeclarativeView):
 	
 	def forceRegistration(self):
 		''' '''
-		print "NO VALID ACCOUNT"
+		self._d("NO VALID ACCOUNT")
 		exit();
 		self.rootObject().forceRegistration(Utilities.getCountryCode());
 		
 	def sendRegRequest(self,number,cc):
-		
 		
 		self.reg.do_register(number,cc);
 		#reg =  ContactsSyncer();
@@ -142,20 +145,33 @@ class WAUI(QDeclarativeView):
 		#reg.reg_fail.connect(self.rootObject().regFail);
 		
 		#reg.start();
+
+
+	def sendSMS(self, num):
+		print "SENDING SMS TO " + num
+		m = QMessage()
+		m.setType(QMessage.Sms)
+		a = QMessageAddress(QMessageAddress.Phone, num)
+		m.setTo(a)
+		m.setBody("")
+		s = QMessageService()
+		s.compose(m)
+
+
+	def makeCall(self, num):
+		print "CALLING TO " + num
+		bus = dbus.SystemBus()
+		csd_call = dbus.Interface(bus.get_object('com.nokia.csd', '/com/nokia/csd/call'), 'com.nokia.csd.Call')
+		csd_call.CreateWith(str(num), dbus.UInt32(0))
 		
-	def blabla(self,tt):
-		print tt
-
-
-
+		
 	def populateContacts(self):
 		#syncer = ContactsSyncer(self.store);
-		
 		
 		#self.c.refreshing.connect(syncer.onRefreshing);
 		#syncer.done.connect(c.updateContacts);
 		
-		print "POPULATE";
+		self._d("POPULATE");
 		contacts = self.c.getContacts();
 		
 		#if len(contacts) == 0:
@@ -166,20 +182,17 @@ class WAUI(QDeclarativeView):
 		#if self.whatsapp is not None:
 		#	self.whatsapp.eventHandler.networkDisconnected()
 
+
 	def populateAllConversations(self, user_id, first, limit):
 
 		#self.rootObject().onReloadingConversations()
-		self.rootObject().updatingConversationsOn()
 		self.messageStore.loadAllConversations(user_id, first, limit)
-		self.rootObject().updatingConversationsOff()
 
 		
 	def populateConversations(self):
 
 		self.rootObject().onReloadingConversations()
-		self.rootObject().updatingConversationsOn()
 		self.messageStore.loadConversations()
-		self.rootObject().updatingConversationsOff()
 		
 		#if self.whatsapp is not None and self.whatsapp.eventHandler.connMonitor.isOnline():
 			#self.whatsapp.eventHandler.networkAvailable()
@@ -191,7 +204,7 @@ class WAUI(QDeclarativeView):
 		self.whatsapp.start();
 	
 	def showUI(self,jid):
-		print "SHOULD SHOW"
+		self._d("SHOULD SHOW")
 		self.showFullScreen();
 		self.rootObject().openConversation(jid)
 		
@@ -200,13 +213,13 @@ class WAUI(QDeclarativeView):
 		if not self.focus:
 			return 0
 		
-		print "GETTING ACTIVE CONV"
+		self._d("GETTING ACTIVE CONV")
 		
 		activeConvJId = QDeclarativeProperty(self.rootObject(),"activeConvJId").read();
 		
 		#self.rootContext().contextProperty("activeConvJId");
-		print "DONE"
-		print activeConvJId
+		self._d("DONE")
+		self._d(activeConvJId)
 		
 		return activeConvJId
 		
@@ -246,9 +259,6 @@ class WAUI(QDeclarativeView):
 		whatsapp.eventHandler.mediaTransferSuccess.connect(self.rootObject().onMediaTransferSuccess);
 		whatsapp.eventHandler.mediaTransferError.connect(self.rootObject().onMediaTransferError);
 		whatsapp.eventHandler.mediaTransferProgressUpdated.connect(self.rootObject().onMediaTransferProgressUpdated)
-
-		whatsapp.eventHandler.mediaTransferSuccess.connect(self.rootObject().onMediaTransferSuccess);
-
 		
 		whatsapp.eventHandler.doQuit.connect(self.preQuit);
 		

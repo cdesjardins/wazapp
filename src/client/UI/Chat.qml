@@ -28,16 +28,16 @@ Rectangle{
     id:container
 
     property string picture:"none";
-    property string name:"User";
-    property string number:"number";
-    property string lastMsg:"Hello World!";
-    property string time:"00:00am"
+    property string name;
+    property string number;
+    property string lastMsg;
+    property string time;
     property string formattedDate;
     property int msgId;
     property int msgType;
     property string state_status
 	property bool isGroup
-	property string unread_messages
+    property int unread_messages
 
     Component.onCompleted: {
         if(msgType ==0){
@@ -45,7 +45,25 @@ Rectangle{
         }
     }
 
-    state:state_status == 0? "sending" : state_status ==1? "pending" : state_status ==2 ? "delivered" : "received"
+	Connections {
+		target: appWindow
+		onClearUnreadMessages: {
+			if (number == clearUnreadMessagesID)
+				unread_messages=0
+		}
+
+		onUpdateChatItem: {
+			console.log("REFRESHING CHAT ITEM: "+ updatedChatId)
+
+			if (number==updatedChatId) {
+				name = updatedChatName
+				picture = updatedChatPicture
+			}
+		}
+
+	}
+
+    //state:state_status == 0? "sending" : state_status ==1? "pending" : state_status ==2 ? "delivered" : "received"
 
     signal clicked(string number);
     signal optionsRequested()
@@ -56,7 +74,7 @@ Rectangle{
     //color: "#e6e6e6"
     color:"transparent"
 
-    states: [
+    /*states: [
         State {
             name: "received"
             PropertyChanges {
@@ -92,7 +110,7 @@ Rectangle{
                 visible:true
             }
         }
-    ]
+    ]*/
 
     MouseArea{
 
@@ -110,10 +128,6 @@ Rectangle{
 		visible: mouseArea.pressed
 	}
 
-	Connections {
-		target: appWindow
-		onUpdateUnreadCount: getUnreadMessages(number)
-	}
 
     Row
     {
@@ -159,9 +173,10 @@ Rectangle{
 
                 Label{
                     id: contact_name
-		            text: name
+                    text: isGroup && name==""?qsTr("Fetching group subject")+"...":name
                    	width:parent.width - 30
                     elide: Text.ElideRight
+                    font.italic: isGroup && name=="";
                     font.bold: true
 					font.pointSize: 18
                     verticalAlignment: Text.AlignVCenter
@@ -172,7 +187,7 @@ Rectangle{
 					smooth: true
 					width: 30
 					height: 26
-					visible: unread_messages!="0"
+                    visible: unread_messages!=0
 					Label {
 						color: "white"
 						font.pixelSize: 14
@@ -190,6 +205,8 @@ Rectangle{
                     height: 18; width: 18
 					smooth: true
                     y:5
+					visible: msgType==1
+					source: "pics/indicators/" + (state_status==0? "sending" : state_status==1? "pending" : "delivered") + ".png"
  				}
                 Label{
                     id:last_msg

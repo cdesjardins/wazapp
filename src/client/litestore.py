@@ -26,11 +26,15 @@ from Models.conversation import *
 from Models.mediatype import Mediatype
 from Models.media import Media
 
+from wadebug import SqlDebug
+
 
 class LiteStore(DataStore):
 	db_dir = os.path.expanduser('~/.wazapp');
 	
 	def __init__(self,current_id):
+		self._d = SqlDebug();
+		
 		self.status = False;
 		self.currentId = current_id;
 		super(LiteStore,self).__init__(current_id);
@@ -49,7 +53,7 @@ class LiteStore(DataStore):
 			self.conn = sqlite3.connect(self.db_path,check_same_thread = False,isolation_level=None)
 			self.status = True;
 			self.c = self.conn.cursor();
-			self.initModels();
+			#self.initModels();
 	
 	
 	def connect(self):
@@ -87,9 +91,6 @@ class LiteStore(DataStore):
 		self.Groupmessage = Groupmessage();
 		self.Groupmessage.setStore(self);
 		
-		
-		
-		
 		#self.Groupmedia = Groupmedia()
 		#self.Groupmedia.setStore(self)
 		
@@ -98,12 +99,9 @@ class LiteStore(DataStore):
 
 	
 	def cacheContacts(self,contacts):
-		print "CACHING"
 		self.cachedContacts = contacts;
-		print "CACHED"
 	
 	def getCachedContacts(self):
-		print "GETTING"
 		return self.cachedContacts;
 	
 	def getContacts(self):
@@ -124,7 +122,7 @@ class LiteStore(DataStore):
 		self.prepareGroupConversations();
 		
 		self.status = True;
-		self.initModels();
+		#self.initModels();
 		
 	
 	
@@ -133,7 +131,17 @@ class LiteStore(DataStore):
 		q = "SELECT name FROM sqlite_master WHERE type='table' AND name='%s'" % tableName;
 		c.execute(q);
 		return len(c.fetchall())
+	
+	def columnExists(self,tableName,columnName):
+		q = "PRAGMA table_info(%s)"%tableName
+		c = self.conn.cursor()
+		c.execute(q)
 		
+		for item in c.fetchall():
+			if item[1] == columnName:
+				return True
+		
+		return False
 		
 	def updateDatabase(self):
 		
@@ -141,10 +149,10 @@ class LiteStore(DataStore):
 		
 		##>0.2.6 check that singleconversations is renamed to conversations
 		
-		print "Checking > 0.2.6 updates"
+		self._d.d("Checking > 0.2.6 updates")
 		
 		if not self.tableExists("conversations"):
-			print "Renaming single conversations to conversations"
+			self._d.d("Renaming single conversations to conversations")
 			
 			q = "ALTER TABLE singleconversations RENAME TO conversations;"
 			c = self.conn.cursor()
@@ -154,28 +162,42 @@ class LiteStore(DataStore):
 			#UPDATE SQLITE_MASTER SET SQL = 'CREATE TABLE BOOKS ( title TEXT NOT NULL, publication_date TEXT)' WHERE NAME = 'BOOKS';
 			#q = "PRAGMA writable_schema = 0";
 		
-		print "Checking addition of media_id to messages"
+		self._d.d("Checking addition of media_id and created columns in messages")
 		
 		q = "PRAGMA table_info(messages)"
 		c = self.conn.cursor()
 		c.execute(q)
 		
-		found = False
-		for item in c.fetchall():
-			if item[1] == "media_id":
-				found = True
-				break
+		media_id = self.columnExists("messages","media_id");
+		created = self.columnExists("messages","created");
 		
-		if not found:
-			print "Not found, altering table"
+		if not media_id:
+			self._d.d("media_id Not found, altering table")
 			c.execute("Alter TABLE messages add column 'media_id' INTEGER")
+		
+		if not created:
+			self._d.d("created Not found, altering table")
+			c.execute("Alter TABLE messages add column 'created' INTEGER")
+			
+			self._d.d("Copying data from timestamp to created col")
+			c.execute("update messages set created = timestamp")
+			
+			
+		self._d.d("Checking addition of 'new' column to conversation")
+		
+		newCol = self.columnExists("conversations","new");
+		
+		if not newCol:
+			self._d.d("'new' not found in conversations. Creating")
+			c.execute("ALTER TABLE conversations add column 'new' INTEGER NOT NULL DEFAULT 0")
+			
 		
 
 	def prepareBase(self):
 		contacts_q = 'CREATE  TABLE "main"."contacts" ("id" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL , "number" VARCHAR NOT NULL  UNIQUE , "jid" VARCHAR NOT NULL, "last_seen_on" DATETIME, "status" VARCHAR)'
 		
 		
-		messages_q = 'CREATE  TABLE "main"."messages" ("id" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL , "conversation_id" INTEGER NOT NULL, "timestamp" INTEGER NOT NULL, "status" INTEGER NOT NULL DEFAULT 0, "content" TEXT NOT NULL,"key" VARCHAR NOT NULL,"type" INTEGER NOT NULL DEFAULT 0,"media_id" INTEGER)'
+		messages_q = 'CREATE  TABLE "main"."messages" ("id" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL , "conversation_id" INTEGER NOT NULL, "timestamp" INTEGER NOT NULL, "status" INTEGER NOT NULL DEFAULT 0, "content" TEXT NOT NULL,"key" VARCHAR NOT NULL,"type" INTEGER NOT NULL DEFAULT 0,"media_id" INTEGER,"created" INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP)'
 		
 		conversations_q = 'CREATE TABLE "main"."conversations" ("id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"contact_id" INTEGER NOT NULL, "created" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)'
 		
@@ -186,9 +208,9 @@ class LiteStore(DataStore):
 
 	def prepareGroupConversations(self):
 		
-		groupmessages_q = 'CREATE TABLE IF NOT EXISTS "main"."groupmessages" ("id" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL , "contact_id" INTEGER NOT NULL, "groupconversation_id" INTEGER NOT NULL,"timestamp" INTEGER NOT NULL, "status" INTEGER NOT NULL DEFAULT 0, "content" TEXT NOT NULL,"key" VARCHAR NOT NULL,"media_id" INTEGER, "type" INTEGER NOT NULL DEFAULT 0)'
+		groupmessages_q = 'CREATE TABLE IF NOT EXISTS "main"."groupmessages" ("id" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL , "contact_id" INTEGER NOT NULL, "groupconversation_id" INTEGER NOT NULL,"timestamp" INTEGER NOT NULL, "status" INTEGER NOT NULL DEFAULT 0, "content" TEXT NOT NULL,"key" VARCHAR NOT NULL,"media_id" INTEGER, "type" INTEGER NOT NULL DEFAULT 0,"created" INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP)'
 		
-		groupconversations_q = 'CREATE TABLE IF NOT EXISTS "main"."groupconversations" ("id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"jid" VARCHAR NOT NULL,groupconversations_contacts_id INTEGER,"picture" VARCHAR,"subject" VARCHAR, "created" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)'
+		groupconversations_q = 'CREATE TABLE IF NOT EXISTS "main"."groupconversations" ("id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"jid" VARCHAR NOT NULL,contact_id INTEGER,"picture" VARCHAR,"subject" VARCHAR, "subject_owner" INTEGER,"subject_timestamp" INTEGER, "created" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,"new" INTEGER NOT NULL DEFAULT 0)'
 		
 		groupconversations_contacts_q = 'CREATE TABLE IF NOT EXISTS "main".groupconversations_contacts ("id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"groupconversation_id" INTEGER NOT NULL,"contact_id" INTEGER NOT NULL)'
 		

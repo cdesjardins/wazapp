@@ -20,15 +20,20 @@ import sqlite3
 import copy
 import time
 
+from wadebug import SqlDebug
+
 class Model(object):
 
 	def setConnection(self,connection):
+		_d = SqlDebug();
+		self._d = _d.d;
+		
 		self.table = self.getTableName();
 		self.conn = connection
 		try:
 			self.cursor  = connection.cursor()
 		except sqlite3.ProgrammingError as e:
-			print e
+			self._d(e)
 			self.store.connect()
 			self.conn = self.store.conn
 			self.cursor = self.conn.cursor()
@@ -141,7 +146,7 @@ class Model(object):
 		elif self.id:
 			q+="WHERE id=%d"%self.id
 		else:
-			print "USE deleteAll to delete all, cancelled!"
+			self._d("USE deleteAll to delete all, cancelled!")
 			
 		c = self.conn.cursor();
 		c.execute(q)
@@ -172,8 +177,8 @@ class Model(object):
 		
 		q = "INSERT INTO %s %s VALUES %s" %(self.table,fields,wq);
 		c = self.conn.cursor();
-		#print q
-		#print values
+		self._d(q)
+		self._d(values)
 		c.execute(q,values);
 		self.conn.commit();
 		
@@ -198,6 +203,9 @@ class Model(object):
 			self.reconnect();
 		
 		c = self.conn.cursor();
+		
+		self._d(q);
+		self._d(updateValues);
 		
 		try:
 			c.execute(q,updateValues);
@@ -357,14 +365,11 @@ class Model(object):
 			data.append(self.createInstance(r));
 		return data
 		
-		
-		
-	
 	def whoami(self):
 		return self.__class__.__name__
 	
 	def runQuery(self,query,whereValues = []):
-		#print query;
+		self._d(query);
 		c = self.conn.cursor();
 		
 		if len(whereValues):

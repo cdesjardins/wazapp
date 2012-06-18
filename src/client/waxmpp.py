@@ -36,7 +36,9 @@ from PySide.QtCore import QThread, QTimer
 from PySide.QtGui import QApplication
 from waupdater import WAUpdater
 from wamediahandler import WAMediaHandler, WAVCardHandler
+from wadebug import WADebug
 import thread
+from watime import WATime
 
 class WAEventHandler(WAEventBase):
 	
@@ -72,6 +74,8 @@ class WAEventHandler(WAEventBase):
 	
 
 	def __init__(self,conn):
+		
+		WADebug.attach(self);
 		self.conn = conn;
 		super(WAEventHandler,self).__init__();
 		
@@ -102,7 +106,7 @@ class WAEventHandler(WAEventBase):
 		
 	
 	def quit(self):
-		Utilities.debug("got quit!!!")
+		
 		#self.connMonitor.exit()
 		#self.conn.disconnect()
 		
@@ -136,17 +140,17 @@ class WAEventHandler(WAEventBase):
 			elif self.conn.state == 2:
 				self.conn.sendPing();
 		except:
-			print "Connection crashed, reason: %s"%sys.exc_info()[1]
+			self._d("Connection crashed, reason: %s"%sys.exc_info()[1])
 			self.networkDisconnected()
 			self.networkAvailable();
 			
-		Utilities.debug("CHECK PASSEDDDDDDDDDDDDDDD")
+		
 	
 	def onLoginFailed(self):
 		self.loginFailed.emit()
 	
 	def onLastSeen(self,jid,seconds,status):
-		print "GOT LAST SEEN ON FROM %s"%(jid)
+		self._d("GOT LAST SEEN ON FROM %s"%(jid))
 		
 		if seconds is not None:
 			self.lastSeenUpdated.emit(jid,int(seconds));
@@ -219,7 +223,7 @@ class WAEventHandler(WAEventBase):
 			media.local_path = savePath
 			media.transfer_status = 2
 			media.save()
-			print media.getModelData();
+			self._d(media.getModelData())
 			self.mediaTransferSuccess.emit(jid,messageId, media.getModelData())
 		
 		
@@ -234,13 +238,14 @@ class WAEventHandler(WAEventBase):
 		message = message.findFirst({'id':messageId});
 		
 		if(message.id):
+			media = message.getMedia()
 			media.transfer_status = 1
 			media.save()
 			self.mediaTransferError.emit(jid,messageId, media.getModelData())
 	
 	
 	def onDirty(self,categories):
-		print categories
+		self._d(categories)
 		#ignored by whatsapp?
 	
 	def onAccountChanged(self,account_kind,expire):
@@ -252,24 +257,24 @@ class WAEventHandler(WAEventBase):
 		return
 	
 	def sendPing(self):
-		print "Pinging"
+		self._d("Pinging")
 		if self.connMonitor.isOnline() and self.conn.state == 2:
 			self.conn.sendPing();
 		else:
 			self.connMonitor.createSession();
 	
 	def onPing(self,idx):
-		print "Sending PONG"
+		self._d("Sending PONG")
 		self.conn.sendPong(idx)
 		
 	
 	def wtf(self,what):
-		print "%s, WTF SHOULD I DO NOW???"%(what)
+		self._d("%s, WTF SHOULD I DO NOW???"%(what))
 	
 		
 	
 	def networkAvailable(self):
-		print "NET AVAILABLE"
+		self._d("NET AVAILABLE")
 		self.updater = WAUpdater()
 		self.updater.updateAvailable.connect(self.updateAvailable)
 		
@@ -291,15 +296,15 @@ class WAEventHandler(WAEventBase):
 		self.conn.changeState(0);
 		#thread.start_new_thread(self.conn.changeState, (0,))
 		#self.conn.disconnect();
-		print "NET SLEEPING"
+		self._d("NET SLEEPING")
 		
 	def networkUnavailable(self):
 		self.disconnected.emit();
-		print "NET UNAVAILABLE";
+		self._d("NET UNAVAILABLE");
 		
 		
 	def onUnavailable(self):
-		print "SEND UNAVAILABLE"
+		self._d("SEND UNAVAILABLE")
 		self.conn.sendUnavailable();
 	
 	
@@ -326,7 +331,7 @@ class WAEventHandler(WAEventBase):
 		self.conn.sendMessageWithBody(fmsg);
 	
 	def notificationClicked(self,jid):
-		print "SHOW UI for "+jid
+		self._d("SHOW UI for "+jid)
 		self.showUI.emit(jid);
 
 	def message_received(self,fmsg,duplicate = False):
@@ -349,15 +354,16 @@ class WAEventHandler(WAEventBase):
 				#	self.fetchVCard(fmsg.id)
 			
 
+				
 			if fmsg.Conversation.type == "single":
-				self.notifier.newMessage(msg_contact.jid, msg_contact.name, fmsg.content,None if type(msg_contact.picture) == str else str(msg_contact.picture),callback = self.notificationClicked);
+				self.notifier.newMessage(msg_contact.jid, msg_contact.name, fmsg.content,None if type(msg_contact.picture) == str else msg_contact.picture.encode('utf-8'),callback = self.notificationClicked);
 			else:
 				conversation = fmsg.getConversation();
-				self.notifier.newMessage(conversation.jid, "%s in %s"%(msg_contact.name,conversation.subject), fmsg.content,None if type(msg_contact.picture) == str else str(msg_contact.picture),callback = self.notificationClicked);
+				self.notifier.newMessage(conversation.jid, "%s in %s"%(msg_contact.name,conversation.subject), fmsg.content,None if type(msg_contact.picture) == str else msg_contact.picture.encode('utf-8'),callback = self.notificationClicked);
 			
-			Utilities.debug("A {msg_type} message was received: {data}".format(msg_type=msg_type, data=fmsg.content));
+			self._d("A {msg_type} message was received: {data}".format(msg_type=msg_type, data=fmsg.content));
 		else:
-			Utilities.debug("A {msg_type} message was received".format(msg_type=msg_type));
+			self._d("A {msg_type} message was received".format(msg_type=msg_type));
 
 		if(fmsg.wantsReceipt):
 			self.conn.sendMessageReceived(fmsg);
@@ -374,38 +380,66 @@ class WAEventHandler(WAEventBase):
 		if(fromm == self.conn.jid):
 			return
 		self.available.emit(fromm)
-		Utilities.debug("{Friend} is now available".format(Friend = fromm));
+		self._d("{Friend} is now available".format(Friend = fromm));
 	
 	def presence_unavailable_received(self,fromm):
 		if(fromm == self.conn.jid):
 			return
 		self.unavailable.emit(fromm)
-		Utilities.debug("{Friend} is now unavailable".format(Friend = fromm));
+		self._d("{Friend} is now unavailable".format(Friend = fromm));
 	
 	def typing_received(self,fromm):
-		Utilities.debug("{Friend} is typing ".format(Friend = fromm))
+		self._d("{Friend} is typing ".format(Friend = fromm))
 		self.typing.emit(fromm);
 
 	def paused_received(self,fromm):
-		Utilities.debug("{Friend} has stopped typing ".format(Friend = fromm))
+		self._d("{Friend} has stopped typing ".format(Friend = fromm))
 		self.paused.emit(fromm);
 
-	
 
 	def message_error(self,fmsg,errorCode):
-		Utilities.debug("Message Error {0}\n Error Code: {1}".format(fmsg,str(errorCode)));
+		self._d("Message Error {0}\n Error Code: {1}".format(fmsg,str(errorCode)));
 
 	def message_status_update(self,fmsg):
-		Utilities.debug("Message status updated {0} for {1}".format(fmsg.status,fmsg.getConversation().getJid()));
+		self._d("Message status updated {0} for {1}".format(fmsg.status,fmsg.getConversation().getJid()));
 		
 		if fmsg.status == WAXMPP.message_store.store.Message.STATUS_SENT:
 			self.messageSent.emit(fmsg.id,fmsg.getConversation().getJid());
 		elif fmsg.status == WAXMPP.message_store.store.Message.STATUS_DELIVERED:
 			self.messageDelivered.emit(fmsg.id,fmsg.getConversation().getJid()); 
+	
+	
+	def onGroupInfo(self,jid,ownerJid,subject,subjectOwnerJid,subjectT,creation):
+		self._d("Got group info")
+		#self._d("%s,%s,%s,%s,%s,%s"%(jid,owner,subject,subjectOwner,subjectT,creation))
+		
+		conversation = WAXMPP.message_store.getOrCreateConversationByJid(jid);
+		
+		owner = WAXMPP.message_store.store.Contact.getOrCreateContactByJid(ownerJid)
+		subjectOwner = WAXMPP.message_store.store.Contact.getOrCreateContactByJid(subjectOwnerJid)
+		
+		conversation.contact_id = owner.id
+		conversation.subject = subject
+		conversation.subject_owner = subjectOwner.id
+		conversation.subject_timestamp = subjectT
+		conversation.created = creation
+		
+		conversation.save()
+		
+		if conversation.new > 0:
+			lastMessage = conversation.getLastMessage()
+			lastMessage.wantsReceipt = True
+			lastMessage.key = eval(lastMessage.key)
+			#TODO singla conversationUpdated which updates chats and conversations
+			self.message_received(lastMessage,False)
+		
+		
 		
 
 class StanzaReader(QThread):
 	def __init__(self,connection):
+		WADebug.attach(self);
+		
 		self.connection = connection
 		self.inn = connection.inn;
 		self.eventHandler = None;
@@ -418,26 +452,26 @@ class StanzaReader(QThread):
 
 	def run(self):
 		flag = True;
-		Utilities.debug("Read thread started");
+		self._d("Read thread started");
 		while flag == True:
 			
-			Utilities.debug("waiting");
+			self._d("waiting");
 			ready = select.select([self.inn.rawIn], [], [])
 			if ready[0]:
 				try:
 					node = self.inn.nextTree();
 				except ConnectionClosedException:
-					print "Socket closed, got 0 bytes"
+					self._d("Socket closed, got 0 bytes")
 					
 					if self.eventHandler.connMonitor.isOnline():
 						self.eventHandler.connMonitor.connected.emit()
 					return
 				except:
-					print "Unhandled error: %s .restarting connection " % sys.exc_info()[1]
+					self._d("Unhandled error: %s .restarting connection " % sys.exc_info()[1])
 					if self.eventHandler.connMonitor.isOnline():
 						self.eventHandler.connMonitor.connected.emit()
 					else:
-						print "Not online, aborting restart"
+						self._d("Not online, aborting restart")
 					return
 					
 					
@@ -537,9 +571,9 @@ class StanzaReader(QThread):
 							status = node.getAttributeValue("status")
 							
 							if add is not None:
-								print "GROUP EVENT ADD"
+								self._d("GROUP EVENT ADD")
 							elif remove is not None:
-								print "GROUP EVENT REMOVE"
+								self._d("GROUP EVENT REMOVE")
 							elif status == "dirty":
 								categories = self.parseCategories(node);
 								self.eventHandler.onDirty(categories);
@@ -566,7 +600,7 @@ class StanzaReader(QThread):
 	
 	
 	def handlePingResponse(self,node,fromm):
-		print "Ping response received"
+		self._d("Ping response received")
 		    		
 			    		
 	def handleLastOnline(self,node,jid=None):
@@ -580,9 +614,18 @@ class StanzaReader(QThread):
 			if seconds is not None and jid is not None:
 				self.eventHandler.onLastSeen(jid,int(seconds),status);
 		except:
-			print "Ignored exception in handleLastOnline "+ sys.exc_info()[1]
+			self._d("Ignored exception in handleLastOnline "+ sys.exc_info()[1])
 			
-			
+	def handleGroupInfo(self,node,jid):
+		groupNode = node.getChild(0)
+		ProtocolTreeNode.require(groupNode,"group")
+		gid = groupNode.getAttributeValue("id")
+		owner = groupNode.getAttributeValue("owner")
+		subject = groupNode.getAttributeValue("subject")
+		subjectT = groupNode.getAttributeValue("s_t")
+		subjectOwner = groupNode.getAttributeValue("s_o")
+		creation = groupNode.getAttributeValue("creation")
+		self.eventHandler.onGroupInfo(jid,owner,subject,subjectOwner,int(subjectT),int(creation))
 
 	def parseCategories(self,dirtyNode):
 		categories = {}
@@ -595,9 +638,17 @@ class StanzaReader(QThread):
 		
 		return categories
 
+	def parseOfflineMessageStamp(self,stamp):
+		
+		watime = WATime();
+		parsed = watime.parseIso(stamp)
+		local = watime.utcToLocal(parsed)
+		stamp = watime.datetimeToTimestamp(local)
+		
+		return stamp
+	
 	def parseMessage(self,messageNode):
 	
-		print messageNode.toString()
 		
 		#if messageNode.getChild("media") is not None:
 		#	return
@@ -671,7 +722,7 @@ class StanzaReader(QThread):
 							self.eventHandler.paused_received(fromAttribute);
 				
 				elif ProtocolTreeNode.tagEquals(childNode,"media") and msg_id is not None:
-					print "MULTIMEDIA MESSAGE!";
+					self._d("MULTIMEDIA MESSAGE!");
 					mediaItem = WAXMPP.message_store.store.Media.create()
 					mediaItem.remote_url = messageNode.getChild("media").getAttributeValue("url");
 					mediaType = messageNode.getChild("media").getAttributeValue("type")
@@ -690,20 +741,13 @@ class StanzaReader(QThread):
 					if mediaType == "image":
 						mediaItem.mediatype_id = WAConstants.MEDIA_TYPE_IMAGE
 						mediaItem.preview = messageNode.getChild("media").data
-						msgdata = QtCore.QCoreApplication.translate("StanzaReader", "Image")
 					elif mediaType == "audio":
 						mediaItem.mediatype_id = WAConstants.MEDIA_TYPE_AUDIO
-						msgdata = QtCore.QCoreApplication.translate("StanzaReader", "Audio")
 					elif mediaType == "video":
 						mediaItem.mediatype_id = WAConstants.MEDIA_TYPE_VIDEO
-						msgdata = QtCore.QCoreApplication.translate("StanzaReader", "Video")
 					elif mediaType == "location":
 						mlatitude = messageNode.getChild("media").getAttributeValue("latitude")
 						mlongitude = messageNode.getChild("media").getAttributeValue("longitude")
-						if messageNode.getChild("media").getAttributeValue("name") is None:
-							msgdata = QtCore.QCoreApplication.translate("StanzaReader", "Location")
-						else:
-							msgdata = messageNode.getChild("media").getAttributeValue("name")
 						mediaItem.mediatype_id = WAConstants.MEDIA_TYPE_LOCATION
 						mediaItem.remote_url = None
 						mediaItem.preview = messageNode.getChild("media").data
@@ -714,7 +758,7 @@ class StanzaReader(QThread):
 						return
 						mediaItem.preview = messageNode.getChild("media").data
 					else:
-						print "Unknown media type"
+						self._d("Unknown media type")
 						return
 							
 					fmsg.Media = mediaItem
@@ -723,16 +767,8 @@ class StanzaReader(QThread):
 					#	msgdata = msgdata + " " + childNode.data;		But it's not supported in whatsapp?
 
 					key = Key(fromAttribute,False,msg_id);
-					ret = WAXMPP.message_store.get(key);
-				
-					if ret is None:
-						fmsg.setData({"status":0,"key":key.toString(),"content":msgdata,"type":WAXMPP.message_store.store.Message.TYPE_RECEIVED});
 					
-						WAXMPP.message_store.pushMessage(fromAttribute,fmsg)
-						fmsg.key = key
-					else:
-						fmsg.key = eval(ret.key)
-						duplicate = True;
+					fmsg.setData({"status":0,"key":key.toString(),"content":msgdata,"type":WAXMPP.message_store.store.Message.TYPE_RECEIVED});
 				
 				elif ProtocolTreeNode.tagEquals(childNode,"body") and msg_id is not None:
 					msgdata = childNode.data;
@@ -743,36 +779,28 @@ class StanzaReader(QThread):
 					fmsg.Media = None
 					
 					key = Key(fromAttribute,False,msg_id);
-					ret = WAXMPP.message_store.get(key);
-
 					
-					if ret is None:
-						
-						fmsg.setData({"status":0,"key":key.toString(),"content":msgdata,"type":WAXMPP.message_store.store.Message.TYPE_RECEIVED});
-						
-						try:
-							index = fromAttribute.index('-')
-							#group conv
-							contact = WAXMPP.message_store.store.Contact.getOrCreateContactByJid(author)
-							fmsg.contact_id = contact.id
-							fmsg.contact = contact
-						except ValueError: #single conv
-							pass
-						
-						WAXMPP.message_store.pushMessage(fromAttribute,fmsg)
-						fmsg.key = key
-						
-						#if self.eventHandler is not None:
-						#self.eventHandler.message_received(fmsg);
-					else:
-						fmsg.key = eval(ret.key)
-						duplicate = True;
+					
+					fmsg.setData({"status":0,"key":key.toString(),"content":msgdata,"type":WAXMPP.message_store.store.Message.TYPE_RECEIVED});
+					
+				
 				elif not (ProtocolTreeNode.tagEquals(childNode,"active")):
 					if ProtocolTreeNode.tagEquals(childNode,"request"):
 						fmsg.wantsReceipt = True;
 					
 					elif ProtocolTreeNode.tagEquals(childNode,"notify"):
 						fmsg.notify_name = childNode.getAttributeValue("name");
+						
+						
+					elif ProtocolTreeNode.tagEquals(childNode,"delay"):
+						xmlns = childNode.getAttributeValue("xmlns");
+						if "urn:xmpp:delay" == xmlns:
+							stamp_str = childNode.getAttributeValue("stamp");
+							if stamp_str is not None:
+								stamp = stamp_str	
+								fmsg.timestamp = self.parseOfflineMessageStamp(stamp)*1000;
+								fmsg.offline = True;
+					
 					elif ProtocolTreeNode.tagEquals(childNode,"x"):
 						xmlns = childNode.getAttributeValue("xmlns");
 						if "jabber:x:event" == xmlns and msg_id is not None:
@@ -800,7 +828,7 @@ class StanzaReader(QThread):
 							WAXMPP.message_store.updateStatus(message,WAXMPP.message_store.store.Message.STATUS_DELIVERED)
 							if self.eventHandler is not None:
 								self.eventHandler.message_status_update(message);
-							print  self.connection.supports_receipt_acks
+							self._d(self.connection.supports_receipt_acks)
 							if self.connection.supports_receipt_acks:
 								
 								receipt_type = childNode.getAttributeValue("type");
@@ -815,8 +843,39 @@ class StanzaReader(QThread):
 				fmsg.timestamp = time.time()*1000;
 				fmsg.offline = False;
 			
+			print fmsg.getModelData();
+			
 			if self.eventHandler is not None:
-				self.eventHandler.message_received(fmsg,duplicate);
+				signal = True
+				if fmsg.content:
+					
+					try:
+						index = fromAttribute.index('-')
+						#group conv
+						contact = WAXMPP.message_store.store.Contact.getOrCreateContactByJid(author)
+						fmsg.contact_id = contact.id
+						fmsg.contact = contact
+					except ValueError: #single conv
+						pass
+						
+					if conversation.type == "group":
+						if conversation.subject is None:
+							signal = False
+							self._d("GETTING GROUP INFO")
+							self.connection.sendGetGroupInfo(fromAttribute)
+							
+					ret = WAXMPP.message_store.get(key);
+					
+					if ret is None:
+						conversation.incrementNew();		
+						WAXMPP.message_store.pushMessage(fromAttribute,fmsg)
+						fmsg.key = key
+					else:
+						fmsg.key = eval(ret.key)
+						duplicate = True;
+				
+				if signal:
+					self.eventHandler.message_received(fmsg,duplicate);
 			
 
 
@@ -824,7 +883,9 @@ class StanzaReader(QThread):
 class WAXMPP():
 	message_store = None
 	def __init__(self,domain,resource,user,push_name,password):
-	
+		
+		WADebug.attach(self);
+		
 		self.domain = domain;
 		self.resource = resource;
 		self.user=user;
@@ -916,11 +977,11 @@ class WAXMPP():
 		self.changeState(3);
 	
 	def changeState(self,newState):
-		print "Entering critical area"
+		self._d("Entering critical area")
 		self.waiting+=1
 		self.lock.acquire()
 		self.waiting-=1
-		print "inside critical area"
+		self._d("inside critical area")
 		
 		if self.state == 0:
 			if newState == 2:
@@ -938,7 +999,7 @@ class WAXMPP():
 					
 					
 					if self.connTries >= 3:
-						print "%i or more failed connections. Will try again in 30 seconds" % self.connTries
+						self._d("%i or more failed connections. Will try again in 30 seconds" % self.connTries)
 						QTimer.singleShot(30000,self.retryLogin)
 						self.connTries-=1
 						
@@ -964,7 +1025,7 @@ class WAXMPP():
 				self.state = 0
 		
 		
-		print "Releasing lock"
+		self._d("Releasing lock")
 		self.lock.release()
 		
 		
@@ -1033,14 +1094,14 @@ class WAXMPP():
 		
 		
 		messages = WAXMPP.message_store.getUnsent();
-		print "Resending %i old messages"%(len(messages))
+		self._d("Resending %i old messages"%(len(messages)))
 		for m in messages:
 			self.sendMessageWithBody(m);
 		
 		
 	
 	def sendTyping(self,jid):
-		print "SEND TYPING TO JID"
+		self._d("SEND TYPING TO JID")
 		composing = ProtocolTreeNode("composing",{"xmlns":"http://jabber.org/protocol/chatstates"})
 		message = ProtocolTreeNode("message",{"to":jid,"type":"chat"},[composing]);
 		self.out.write(message);
@@ -1048,7 +1109,7 @@ class WAXMPP():
 	
 		
 	def sendPaused(self,jid):
-		print "SEND PAUSED TO JID"
+		self._d("SEND PAUSED TO JID")
 		composing = ProtocolTreeNode("paused",{"xmlns":"http://jabber.org/protocol/chatstates"})
 		message = ProtocolTreeNode("message",{"to":jid,"type":"chat"},[composing]);
 		self.out.write(message);
@@ -1061,7 +1122,7 @@ class WAXMPP():
 		return messageNode
 	
 	def sendSubjectReceived(self,to,msg_id):
-		print "Sending subject recv receipt"
+		self._d("Sending subject recv receipt")
 		receivedNode = ProtocolTreeNode("received",{"xmlns": "urn:xmpp:receipts"});
 		messageNode = self.getSubjectMessage(to,msg_id,receivedNode);
 		self.out.write(messageNode);
@@ -1115,7 +1176,7 @@ class WAXMPP():
 		
 		self.sendSubscribe(jid);
 		
-		print "presence request Initiated for %s"%(jid)
+		self._d("presence request Initiated for %s"%(jid))
 		idx = self.makeId("last_")
 		self.stanzaReader.requests[idx] = self.stanzaReader.handleLastOnline;
 		
@@ -1170,6 +1231,17 @@ class WAXMPP():
 		
 		self.out.write(iqNode);
 		
+	
+	
+	def sendGetGroupInfo(self,jid):
+		idx = self.makeId("get_g_info_")
+		self.stanzaReader.requests[idx] = self.stanzaReader.handleGroupInfo;
+		
+		queryNode = ProtocolTreeNode("query",{"xmlns":"w:g"})
+		iqNode = ProtocolTreeNode("iq",{"id":idx,"type":"get","to":jid},[queryNode])
+		
+		self.out.write(iqNode)
+
 	
 	def getMessageNode(self,fmsg,child):
 			requestNode = None;

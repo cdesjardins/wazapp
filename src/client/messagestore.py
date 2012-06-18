@@ -20,16 +20,22 @@ from PySide import QtCore
 from PySide.QtCore import QObject
 import time
 import datetime
+from wadebug import MessageStoreDebug
+
 
 class MessageStore(QObject):
 
 
 	messageStatusUpdated = QtCore.Signal(str,int,int);
 	messagesReady = QtCore.Signal(dict);
+	conversationReady = QtCore.Signal(dict);
 	
 	currKeyId = 0
 
 	def __init__(self,dbstore):
+	
+		_d = MessageStoreDebug();
+		self._d = _d.d;
 		super(MessageStore,self).__init__();
 		
 		self.store = dbstore
@@ -40,8 +46,13 @@ class MessageStore(QObject):
 		#	self.loadMessages(m.getContact());
 		#load messages for jids of those ids
 		
-		
-		
+	
+	def onConversationOpened(self,jid):
+		if not self.conversations.has_key(jid):
+			return
+			
+		conv = self.conversations[jid]
+		conv.clearNew();
 	
 	def deleteConversation(self,jid):
 	
@@ -57,7 +68,7 @@ class MessageStore(QObject):
 		conv.delete();
 		del self.conversations[jid]
 
-
+	
 
 	def deleteSingleMessage(self,jid,msgid):
 
@@ -71,14 +82,24 @@ class MessageStore(QObject):
 		else:
 			self.store.Groupmessage.delete({"groupconversation_id":conv.id, "id":msgid})
 
-
+	
+	
 	
 	def loadConversations(self):
 		conversations = self.store.ConversationManager.findAll();
-		print "init load convs"
+		self._d("init load convs")
 		for c in conversations:
-			print "loading messages"
 			jid = c.getJid();
+			
+			conv = c.getModelData();
+			conv["lastMessage"] = c.lastMessage.getModelData() if c.lastMessage is not None else {}
+			conv["jid"]= jid;
+			
+			self._d(conv);
+			self.conversationReady.emit(conv);
+			
+			self._d("loading messages")
+			
 			self.conversations[jid] = c
 			self.loadMessages(jid, 0, 0, 1)
 			print "loaded messages"
@@ -100,7 +121,6 @@ class MessageStore(QObject):
 		tmp["user_id"] = jid
 		tmp["data"] = []
 		
-		
 		for m in messages:
 			msg = m.getModelData()
 			msg['formattedDate'] = datetime.datetime.fromtimestamp(int(msg['timestamp'])/1000).strftime('%d-%m-%Y %H:%M')
@@ -110,8 +130,9 @@ class MessageStore(QObject):
 			media = m.getMedia()
 			msg['media']= media.getModelData() if media is not None else None
 			msg['msg_id'] = msg['id']
+			msg['conversation']=self.conversations[jid].getModelData();
+			msg['conversation']['unread']=msg['conversation']['new']
 			tmp["data"].append(msg)
-			
 			
 			
 		self.messagesReady.emit(tmp);
@@ -182,7 +203,7 @@ class MessageStore(QObject):
 		return localKey;
 	
 	def updateStatus(self,message,status):
-		print "UPDATING STATUS TO "+str(status);
+		self._d("UPDATING STATUS TO "+str(status));
 		message.status = status
 		message.save()
 		conversation = message.getConversation()
@@ -194,13 +215,6 @@ class MessageStore(QObject):
 		if index >= 0:
 			#message is loaded
 			self.conversations[jid].messages[index] = message
-			
-			print "WILL EMIT:"
-			print jid
-			print message.id
-			print status
-			print "END EMIT"
-			
 			self.messageStatusUpdated.emit(jid,message.id,status)
 	
 	def getMessageIndex(self,jid,msg_id):
@@ -243,7 +257,7 @@ class MessageStore(QObject):
 		return msg
 		
 
-	def pushMessage(self,jid,message):
+	def pushMessage(self,jid,message,signal=True):
 		
 		conversation = self.getOrCreateConversationByJid(jid);
 		message.setConversation(conversation)
@@ -262,13 +276,13 @@ class MessageStore(QObject):
 		
 		
 		
-		if self.conversations.has_key(jid):
-			self.conversations[jid].messages.append(message)
-		else:
-			self.conversations[jid] = conversation
-			self.conversations[jid].messages.append(message)
-			
-		self.sendMessagesReady(jid,[message]);
+		self.conversations[jid] = conversation #to rebind new unread counts
+		self.conversations[jid].messages.append(message)
+		
+		
+		
+		if signal:	
+			self.sendMessagesReady(jid,[message]);
 		
 class Key():
 	def __init__(self,remote_jid, from_me,idd):

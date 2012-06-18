@@ -58,12 +58,13 @@ Rectangle {
 		anchors.topMargin: from_me ? 8 : 0
 		anchors.left: parent.left
 		anchors.leftMargin: from_me ? 10 : parent.width-width-10
-		width: Math.max(childrenWidth, msg_date.paintedWidth+(from_me?28:0), sender_name.paintedWidth) +26
+		width: Math.max(childrenWidth, msg_date.paintedWidth+(from_me?28:0)+(mediatype_id!=1?66:0), 
+				sender_name.paintedWidth+(mediatype_id!=1?66:0)) +26
 		height: parent.height + (from_me ? 2 : 0)
 
 		source: from_me ? "pics/bubbles/outgoing1-" + (mArea.pressed? "pressed" : "normal") + ".png" : name=="" ?
 				"pics/bubbles/incoming" + parseInt(bubbleColor) + "-" + (mArea.pressed? "pressed" : "normal") + ".png" :
-				"pics/bubbles/incoming" + getBubbleColor(name) + "-" + (mArea.pressed? "pressed" : "normal") + ".png"
+				"pics/bubbles/incoming" + getBubbleColor(author.jid) + "-" + (mArea.pressed? "pressed" : "normal") + ".png"
 
 		border { left: 22; right: 22; bottom: 22; top: 22; }
 

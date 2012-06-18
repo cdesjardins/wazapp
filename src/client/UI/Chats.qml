@@ -99,24 +99,6 @@ Page {
     //function updateConversation(msg_id,msgType,user_id, lastMsg,time,formattedDate)
     function updateConversation(msg)
     {
-
-        /*var lastMsg = msg.content
-
-        var tmp = lastMsg.split('\n');
-
-        lastMsg = tmp[0];
-
-        var maxLength = screen.currentOrientation == Screen.Portrait?30:100
-
-        if(tmp.length>1){
-            lastMsg += "..."
-        }else if(lastMsg.length > maxLength){
-            lastMsg = lastMsg.substring(0,maxLength).trim()+"...";
-        }
-        msg.content = lastMsg*/
-
-
-
        // ChatScript.updateChats(msg_id,msgType,user_id,lastMsg,time,formattedDate);
         ChatScript.updateChats(msg);
         chatsContainer.state=""
@@ -144,18 +126,16 @@ Page {
 		}
 		return resp;
 	}
-
-	function getUnreadMessages(uname) {
-		var res = "0"
-		for(var i =0; i<unreadModel.count; i++)
-		{
-			if (unreadModel.get(i).name==uname) {
-				res = parseInt(unreadModel.get(i).val)
-				break;
-	 		}
+	
+	/*function updateChatNames() {
+		console.log("REFRESHING CHAT ITEMS")
+		for (var i=0; i<chatsModel.count;i++) {
+			if (chatsModel.get(i).jid == contacts[i].jid) {
+				chatsModel.get(i).name = 
+			}
 		}
-		return res;
-	}
+	}*/
+
 
     Component{
         id:myDelegate;
@@ -163,31 +143,24 @@ Page {
         Chat{
             property variant contactInfo:ContactsScript.getContactData(model.jid)
             picture: contactInfo.picture;
-            name: contactInfo.name.indexOf("-")>0 ? 
-					qsTr("Group (%1)").arg(getAuthor(contactInfo.name.split('-')[0]+"@s.whatsapp.net").split('@')[0]) : contactInfo.name
+            name: isGroup?model.conversation.subject:contactInfo.name;
 			isGroup: contactInfo.name.indexOf("-")>0
 			number:model.jid;
             lastMsg: Helpers.emojify(Helpers.linkify(model.content))
             time:model.timestamp
             formattedDate: Helpers.getDateText(model.formattedDate).replace("Today", qsTr("Today")).replace("Yesterday", qsTr("Yesterday"))
-			unread_messages: getUnreadMessages(model.jid)
-            onClicked: {
-				chatsContainer.clicked(model.jid,"chats")
-
-				for(var i=0; i<unreadModel.count; i++)
-				{
-					if (unreadModel.get(i).name==model.jid) {
-						unreadModel.get(i).val = 0
-						break;
-				 	}
-				}
-				updateUnreadCount()
-
-			}
+            unread_messages: model.conversation.unread
             width:chatsContainer.width
             msgId: model.id
             msgType:model.type
             state_status:model.status
+
+            onClicked: {
+				chatsContainer.clicked(model.jid,"chats")
+                appWindow.conversationOpened(model.jid);
+				clearUnreadMessagesID = model.jid
+				clearUnreadMessages()
+			}
 
             onOptionsRequested: {
 				console.log("OPTIONS! TYPE: " + model.type + " - STATUS: " + model.status) 
@@ -197,6 +170,7 @@ Page {
 				showContactDetails = isGroup? 
 									getAuthor(model.jid).split('-')[0]==getAuthor(contactInfo.name.split('-')[0]+"@s.whatsapp.net").split('@')[0] : 
 									getAuthor(model.jid)==model.jid
+				profileUser = model.jid
                 chatItemMenu.open()
             }
 
@@ -245,7 +219,7 @@ Page {
 		MenuLayout {
 			MyMenuItem {
 				height: 80
-				singleItem: !detailsMenuItem.visible
+				singleItem: !detailsMenuItem.visible && !profileMenuItem.visible
 				text: qsTr("Delete Conversation")
 				onClicked: chatDelConfirm.open()
 			}
@@ -255,6 +229,15 @@ Page {
 				height: visible ? 80 : 0
 				text: contactNumberGroup ? qsTr("Add group owner to contacts") : qsTr("Add to contacs")
 				onClicked: Qt.openUrlExternally("tel:"+contactNumber)
+			}
+			MyMenuItem {
+				id: profileMenuItem
+				height: visible ? 80 : 0
+				visible: !contactNumberGroup
+				text: contactNumberGroup ? qsTr("View group owner profile") : qsTr("View contact profile")
+				onClicked: { 
+					mainPage.pageStack.push (Qt.resolvedUrl("ContactProfile.qml"))
+				}
 			}
 		}
 	}

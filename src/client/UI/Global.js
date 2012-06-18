@@ -47,9 +47,9 @@ function getDateText (mydate) {
 	var str = mydate.slice(0,10)
 
 	if (str==check)
-		return qsTr("Today") + " | " + mydate.slice(11)
+		return "Today" + " | " + mydate.slice(11)
 	else if (str==check2)
-		return qsTr("Yesterday") + " | " + mydate.slice(11)
+		return "Yesterday" + " | " + mydate.slice(11)
 	else
     	return mydate.replace(" ", " | ");
 }

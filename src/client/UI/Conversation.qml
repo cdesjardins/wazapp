@@ -39,6 +39,7 @@ Page {
 			}
             appWindow.conversationActive(user_id);
             appWindow.setActiveConv(user_id)
+			//appWindow.conversationOpened(user_id);
 			pageIsActive = true
 		}
         
@@ -57,6 +58,7 @@ Page {
 	property bool showSendButton
     property string user_id;
     property bool isGroup:user_id.split('-').length > 1
+    property string subject;
     property string user_name;
     property string user_picture;
     property string prev_state:"chats"
@@ -205,20 +207,9 @@ Page {
         //ConvScript.addMessage(message.id,message.content,message.type,message.formattedDate,message.timestamp,message.status);
         ConvScript.addMessage(message);
 
-		if (activeWindow!=user_id && addToUread && message.type==0) {
-			var added =0 
-			for(var i =0; i<unreadModel.count; i++)
-			{
-				if (unreadModel.get(i).name==user_id) {
-					unreadModel.get(i).val = unreadModel.get(i).val +1
-					added = 1;
-					break;
-			 	}
-			}
-			if (added==0) {
-				unreadModel.insert(unreadModel.count, {"name":user_id, "val":1})
-			}
-			updateUnreadCount()
+		if (activeWindow == user_id) {
+			clearUnreadMessagesID = user_id
+			clearUnreadMessages()
 		}
     }
 
@@ -228,6 +219,18 @@ Page {
         return arr[0];
     }
 
+    function getGroupSubject(name)
+    {
+		var str = name;
+		for (var i=0; i<chatsModel.count;i++)
+		{
+			if (chatsModel.get(i).jid==name+"@g.us") {
+				str = chatsModel.get(i).conversation.subject
+				break;
+			}
+		}
+		return str;
+	}
 
     Rectangle{
         id:top_bar
@@ -281,13 +284,14 @@ Page {
 
 	        Label {
 	            id: username
-                text: user_name.indexOf("-")>0 ? 
-						qsTr("Group (%1)").arg(getAuthor(user_name.split('-')[0])) : user_name
+                //text: isGroup?(subject==""?qsTr("Fetching group subject")+"...":subject): user_name
+				text: isGroup? getGroupSubject(user_name) : user_name
 				width: parent.width - 62
 	            horizontalAlignment: Text.AlignRight
 				verticalAlignment: Text.AlignTop
 				anchors.top: parent.top
 	            font.bold: true
+                font.italic: isGroup && subject==""
 				height: 28
 	        }
 			UserStatus {
@@ -305,7 +309,12 @@ Page {
 				MouseArea {
 					anchors.fill: parent
 					// User Profile window. Not finished yet
-					//onClicked: { pageStack.push (Qt.resolvedUrl("ContactProfile.qml")) }
+					onClicked: { 
+						if (!isGroup) {
+							profileUser = activeWindow
+							pageStack.push (Qt.resolvedUrl("ContactProfile.qml"))
+						}
+					}
 				}
             }
 
@@ -540,6 +549,15 @@ Page {
 			//console.log("GETTING END OF LIST")
 			conv_items.positionViewAtIndex(conv_items.count-1, ListView.Contain)
 		}
+
+		onUpdateChatItem: {
+			console.log("REFRESHING CHAT ITEM: "+ updatedChatId)
+			if (user_id==updatedChatId) {
+				user_name = updatedChatName
+				user_picture = updatedChatPicture
+			}
+		}
+
 	}
 
 
@@ -604,6 +622,7 @@ Page {
 								if (chatsModel.get(i).jid==user_id && chatsModel.get(i).content==selectedMessageContent) {
 									chatsModel.get(i).content = conv_data.get(cur).message
 									chatsModel.get(i).type = conv_data.get(cur).type
+									chatsModel.get(i).formattedDate = conv_data.get(cur).timestamp
 									var st = conv_data.get(cur).status=="sending"? 0 : conv_data.get(cur).status=="pending"? 1 : 2
 									chatsModel.get(i).status = conv_data.get(cur).type==0 ? 4 : st
 									break;
@@ -611,6 +630,7 @@ Page {
 							}
 						}
 					}
+
 				}
             }
 
